@@ -21,7 +21,7 @@
 
 #include <QList>
 #include <QString>
-#include <QStringView>
+#include <QStringView>\n#include <QStringList>
 
 #include <algorithm>
 #include <optional>\n#include <utility>
@@ -114,7 +114,7 @@ inline Result parseLrc(const QString &source)
 
     for (const QString &rawLine : sourceLines)
     {
-        QStringView line(rawLine.trimmed());
+        const QString trimmedLine = rawLine.trimmed();\n        QStringView line(trimmedLine);
         QList<qint64> lineTimes;
 
         // LRC permits multiple line timestamps on one line.
