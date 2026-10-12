@@ -24,7 +24,7 @@
 #include <QStringView>
 
 #include <algorithm>
-#include <optional>
+#include <optional>\n#include <utility>
 
 namespace LyricsParser
 {
@@ -174,11 +174,14 @@ inline Result parseLrc(const QString &source)
                 continue;
             }
 
-            cursor = close + 1;
-            const qsizetype nextTag = text.indexOf(u'<', cursor);
-            const QString wordText = text.mid(cursor, nextTag < 0 ? -1 : nextTag - cursor);
+            const qsizetype wordStart = close + 1;
+            const qsizetype nextTag = text.indexOf(u'<', wordStart);
+            const QString wordText = text.mid(wordStart,
+                nextTag < 0 ? -1 : nextTag - wordStart);
+            plainText += wordText;
             if (!wordText.isEmpty())
                 words.push_back({ wordText, *wordTime });
+            cursor = nextTag < 0 ? text.size() : nextTag;
         }
 
         for (qint64 time : lineTimes)
