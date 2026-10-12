@@ -22,7 +22,7 @@
 
 #include "dialogs/extensions/extensions_manager.hpp"
 #include "player_controller.hpp"
-#include "player_controller_p.hpp"
+#include "player_controller_p.hpp"\n#include "lyrics_parser.hpp"
 #include "util/shared_input_item.hpp"
 
 #include <vlc_actions.h>           /* ACTION_ID */
@@ -240,19 +240,37 @@ PlayerControllerPrivate::syltLyrics() const
             const QString sylt = QString::fromUtf8(m_syltRaw->first);
             m_syltRaw->first.clear();
 
-            const auto entries = QStringView( sylt ).split( QChar( 0x1E ), Qt::SkipEmptyParts );
+            // Some containers expose unsynchronized lyrics as LRC text. Parse
+            // timestamped LRC when present, while retaining VLC's existing
+            // SYLT/USLT separator format for all other metadata.
+            const QString trimmed = sylt.trimmed();
+            const bool looksLikeLrc = trimmed.startsWith(u'[')
+                && trimmed.contains(u']')
+                && (trimmed.contains(u":") || trimmed.contains(u"offset:", Qt::CaseInsensitive));
 
-            for (const QStringView &entry : entries)
+            if (looksLikeLrc)
             {
-                const qsizetype sep = entry.indexOf( QChar( 0x1F ) );
-                if (sep <= 0)
-                    continue;
-
-                const vlc_tick_t time =
-                    VLC_TICK_FROM_MS( entry.first( sep ).toLongLong() );
-                lyrics.push_back( TimedText( entry.sliced( sep + 1 ).toString(), VLCTime( time ) ) );
+                const LyricsParser::Result parsed = LyricsParser::parseLrc(sylt);
+                for (const LyricsParser::Line &line : parsed.lines)
+                    lyrics.push_back(TimedText(line.text,
+                        VLCTime(VLC_TICK_FROM_MS(line.timeMs))));
             }
-            m_syltLyrics = std::move( lyrics );
+            else
+            {
+                const auto entries = QStringView(sylt).split(QChar(0x1E), Qt::SkipEmptyParts);
+
+                for (const QStringView &entry : entries)
+                {
+                    const qsizetype sep = entry.indexOf(QChar(0x1F));
+                    if (sep <= 0)
+                        continue;
+
+                    const vlc_tick_t time =
+                        VLC_TICK_FROM_MS(entry.first(sep).toLongLong());
+                    lyrics.push_back(TimedText(entry.sliced(sep + 1).toString(), VLCTime(time)));
+                }
+            }
+            m_syltLyrics = std::move(lyrics);
         }
     }
     return *m_syltLyrics;
